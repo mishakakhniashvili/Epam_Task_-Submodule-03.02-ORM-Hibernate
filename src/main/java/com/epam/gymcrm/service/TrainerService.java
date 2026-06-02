@@ -1,25 +1,26 @@
 package com.epam.gymcrm.service;
 
-import com.epam.gymcrm.dao.TraineeDao;
 import com.epam.gymcrm.dao.TrainerDao;
-import com.epam.gymcrm.model.Trainee;
-import com.epam.gymcrm.model.Trainer;
+import com.epam.gymcrm.dao.UserDao;
+import com.epam.gymcrm.entity.Trainee;
+import com.epam.gymcrm.entity.Trainer;
+import com.epam.gymcrm.entity.User;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
 @Service
 public class TrainerService {
     private static final Logger LOGGER = LoggerFactory.getLogger(TrainerService.class);
     private TrainerDao trainerDao;
-    private TraineeDao traineeDao;
     private UsernameGenerator usernameGenerator;
     private PasswordGenerator passwordGenerator;
+    private UserDao userDao;
 
     @Autowired
     public void setTrainerDao(TrainerDao trainerDao) {
@@ -32,34 +33,38 @@ public class TrainerService {
     }
 
     @Autowired
-    public void setTraineeDao(TraineeDao traineeDao) {
-        this.traineeDao = traineeDao;
-    }
-
-    @Autowired
     public void setPasswordGenerator(PasswordGenerator passwordGenerator) {
         this.passwordGenerator = passwordGenerator;
     }
 
+    @Transactional
     public Trainer create(Trainer trainer) {
-        trainer.setUserId(generateNextId());
-        trainer.setUsername(generateUsername(trainer));
-        trainer.setPassword(passwordGenerator.generatePassword());
-        trainer.setActive(true);
+        User user = trainer.getUser();
+        String username = generateUsername(trainer);
 
-        LOGGER.info("Creating trainer with id={} and username={}", trainer.getUserId(), trainer.getUsername());
+        user.setUsername(username);
+        user.setPassword(passwordGenerator.generatePassword());
+        user.setActive(true);
 
-        return trainerDao.save(trainer);
+        Trainer createdTrainer = trainerDao.save(trainer);
+        LOGGER.info("Created trainer with id={} and username={}",
+                createdTrainer.getId(),
+                createdTrainer.getUser().getUsername());
+
+        return createdTrainer;
     }
 
-    public Trainer update(Trainer trainer) {
-        LOGGER.info("Updating trainer with id={}", trainer.getUserId());
+    @Transactional
+    public Trainer update(String username, String password, Trainer trainer) {
+        validateCredentials(username, password);
+        LOGGER.info("Updating trainer with id={}", trainer.getId());
         return trainerDao.update(trainer);
     }
 
-    public Optional<Trainer> findById(Long userId) {
-        LOGGER.info("Finding trainer with id={}", userId);
-        return trainerDao.findById(userId);
+    public Optional<Trainer> findById(Long id) {
+
+        LOGGER.info("Finding trainer with id={}", id);
+        return trainerDao.findById(id);
     }
 
     public List<Trainer> findAll() {
@@ -67,31 +72,76 @@ public class TrainerService {
         return trainerDao.findAll();
     }
 
-
-    //finds the largest id and creates the next one by adding 1
-    private Long generateNextId() {
-        return trainerDao.findAll()
-                .stream()
-                .map(Trainer::getUserId)
-                .max(Long::compareTo)
-                .orElse(0L) + 1;
-    }
-
     //finds every existing username and generates a new one according to the rules
     private String generateUsername(Trainer trainer) {
-        List<String> existingUsernames = trainerDao.findAll()
-                .stream()
-                .map(Trainer::getUsername)
-                .collect(Collectors.toList());
-        existingUsernames.addAll(traineeDao.findAll()
-                .stream()
-                .map(Trainee::getUsername)
-                .toList());
+        User user = trainer.getUser();
+        List<String> existingUsernames = userDao.findAllUsernames();
 
         return usernameGenerator.generateUsername(
-                trainer.getFirstName(),
-                trainer.getLastName(),
+                user.getFirstName(),
+                user.getLastName(),
                 existingUsernames
         );
     }
+
+    @Autowired
+    public void setUserDao(UserDao userDao) {
+        this.userDao = userDao;
+    }
+
+    public Optional<Trainer> findByUsername(String authUsername, String authPassword, String targetUsername) {
+        validateCredentials(authUsername, authPassword);
+        LOGGER.info("Finding trainer with username={}", targetUsername);
+        return trainerDao.findByUsername(targetUsername);
+    }
+
+
+    public boolean isCredentialsValid(String username, String password) {
+        return trainerDao.findByUsername(username)
+                .map(trainer -> trainer.getUser().getPassword().equals(password))
+                .orElse(false);
+    }
+
+    public void validateCredentials(String username, String password){
+        if(!isCredentialsValid(username, password)){
+            throw new SecurityException("Invalid credentials entered");
+        }
+    }
+
+    @Transactional
+    public void changePassword(String username, String oldPassword, String newPassword) {
+        validateCredentials(username, oldPassword);
+
+        Trainer trainer = trainerDao.findByUsername(username).orElseThrow();
+
+        trainer.getUser().setPassword(newPassword);
+
+        trainerDao.update(trainer);
+
+        LOGGER.info("Changed password for username={}", username);
+    }
+
+
+    @Transactional
+    public void activate(String username, String password){
+        validateCredentials(username, password);
+        Trainer trainer = trainerDao.findByUsername(username).orElseThrow();
+        if(trainer.getUser().isActive()){
+            throw new IllegalStateException("Trainer is already active.");}
+        trainer.getUser().setActive(true);
+        trainerDao.update(trainer);
+        LOGGER.info("Activated trainer with id={}", trainer.getId());
+    }
+
+    @Transactional
+    public void deactivate(String username, String password){
+        validateCredentials(username, password);
+        Trainer trainer = trainerDao.findByUsername(username).orElseThrow();
+        if(!trainer.getUser().isActive()){
+            throw new IllegalStateException("Trainer is already inactive.");}
+        trainer.getUser().setActive(false);
+        trainerDao.update(trainer);
+        LOGGER.info("Deactivated trainer with id={}", trainer.getId());
+    }
+
 }

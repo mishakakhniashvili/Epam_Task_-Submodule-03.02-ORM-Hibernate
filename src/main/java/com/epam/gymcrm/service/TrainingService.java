@@ -1,11 +1,12 @@
 package com.epam.gymcrm.service;
 
 import com.epam.gymcrm.dao.TrainingDao;
-import com.epam.gymcrm.model.Training;
+import com.epam.gymcrm.entity.Training;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Optional;
@@ -16,32 +17,25 @@ public class TrainingService {
     private TrainingDao trainingDao;
 
     @Autowired
-    public void setTrainingDao(TrainingDao trainingDao) {
+    public void setTrainingDao(TrainingDao trainingDao){
         this.trainingDao = trainingDao;
     }
 
+    @Transactional
     public Training create(Training training) {
-        training.setTrainingId(generateNextId());
+        Training createdTraining = trainingDao.save(training);
 
-        LOGGER.info("Creating training with id={} and name={}", training.getTrainingId(), training.getTrainingName());
+        LOGGER.info("Creating training with id={} and name={}", createdTraining.getId(), createdTraining.getTrainingName());
 
-        return trainingDao.save(training);
+        return createdTraining;
     }
 
-    public Optional<Training> findById(Long trainingId) {
-        LOGGER.info("finding training with id={}", trainingId) ;
-        return trainingDao.findById(trainingId);
+    public Optional<Training> findById(Long id) {
+        LOGGER.info("finding training with id={}", id);
+        return trainingDao.findById(id);
     }
 
     public List<Training> findAll() {
         return trainingDao.findAll();
-    }
-
-    private Long generateNextId() {
-        return trainingDao.findAll()
-                .stream()
-                .map(Training::getTrainingId)
-                .max(Long::compareTo)
-                .orElse(0L) + 1;
     }
 }

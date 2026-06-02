@@ -1,43 +1,52 @@
 package com.epam.gymcrm.dao;
 
-import com.epam.gymcrm.model.Trainee;
-import com.epam.gymcrm.storage.Storage;
-import org.springframework.beans.factory.annotation.Autowired;
+import com.epam.gymcrm.entity.Trainee;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import org.springframework.stereotype.Repository;
 
-import java.util.ArrayList;
+
 import java.util.List;
 import java.util.Optional;
 
 @Repository
 public class TraineeDao {
 
-    private Storage storage;
-
-    @Autowired
-    public void setStorage(Storage storage) {
-        this.storage = storage;
-    }
+    @PersistenceContext
+    private EntityManager entityManager;
 
     public Trainee save(Trainee trainee) {
-        storage.getTrainees().put(trainee.getUserId(), trainee);
+        entityManager.persist(trainee);
         return trainee;
     }
 
     public Trainee update(Trainee trainee) {
-        storage.getTrainees().put(trainee.getUserId(), trainee);
-        return trainee;
+        return entityManager.merge(trainee);
     }
 
-    public void deleteById(Long userId) {
-        storage.getTrainees().remove(userId);
+    public void deleteById(Long id) {
+        findById(id).ifPresent(entityManager::remove);
     }
 
-    public Optional<Trainee> findById(Long userId) {
-        return Optional.ofNullable(storage.getTrainees().get(userId));
+    public Optional<Trainee> findById(Long id) {
+        return Optional.ofNullable(entityManager.find(Trainee.class, id));
     }
 
     public List<Trainee> findAll() {
-        return new ArrayList<>(storage.getTrainees().values());
+        return entityManager
+                .createQuery("select t from Trainee t", Trainee.class)
+                .getResultList();
     }
+
+    public Optional<Trainee> findByUsername(String username) {
+        return entityManager
+                .createQuery(
+                        "select t from Trainee t where t.user.username = :username",
+                        Trainee.class
+                )
+                .setParameter("username", username)
+                .getResultStream()
+                .findFirst();
+    }
+
 }

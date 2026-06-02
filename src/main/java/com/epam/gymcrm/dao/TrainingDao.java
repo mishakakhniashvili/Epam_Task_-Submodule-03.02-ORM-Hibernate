@@ -1,34 +1,29 @@
 package com.epam.gymcrm.dao;
 
-import com.epam.gymcrm.model.Training;
-import com.epam.gymcrm.storage.Storage;
-import org.springframework.beans.factory.annotation.Autowired;
+import com.epam.gymcrm.entity.Training;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import org.springframework.stereotype.Repository;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
 @Repository
 public class TrainingDao {
 
-    private Storage storage;
-
-    @Autowired
-    public void setStorage(Storage storage) {
-        this.storage = storage;
-    }
+    @PersistenceContext
+    private EntityManager entityManager;
 
     public Training save(Training training) {
-        storage.getTrainings().put(training.getTrainingId(), training);
+        entityManager.persist(training);
         return training;
     }
 
-    public Optional<Training> findById(Long trainingId) {
-        return Optional.ofNullable(storage.getTrainings().get(trainingId));
+    public Optional<Training> findById(Long id) {
+        return Optional.ofNullable(entityManager.find(Training.class, id));
     }
 
     public List<Training> findAll() {
-        return new ArrayList<>(storage.getTrainings().values());
+        return entityManager.createQuery("select tr from Training tr", Training.class).getResultList();
     }
 }

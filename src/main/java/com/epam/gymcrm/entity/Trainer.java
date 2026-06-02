@@ -1,10 +1,14 @@
 package com.epam.gymcrm.entity;
 
 import jakarta.persistence.*;
+import lombok.Getter;
+import lombok.Setter;
 
 import java.util.HashSet;
 import java.util.Set;
 
+@Setter
+@Getter
 @Entity
 @Table(name = "trainers")
 public class Trainer {
@@ -24,14 +28,6 @@ public class Trainer {
     @ManyToMany(mappedBy = "trainers")
     private Set<Trainee> trainees = new HashSet<>();
 
-    public Set<Trainee> getTrainees() {
-        return trainees;
-    }
-
-    public void setTrainees(Set<Trainee> trainees) {
-        this.trainees = trainees;
-    }
-
     public Trainer() {}
 
     public Trainer(User user, TrainingType specialization) {
@@ -39,27 +35,4 @@ public class Trainer {
         this.specialization = specialization;
     }
 
-    public Long getId() {
-        return id;
-    }
-
-    public void setId(Long id) {
-        this.id = id;
-    }
-
-    public User getUser() {
-        return user;
-    }
-
-    public void setUser(User user) {
-        this.user = user;
-    }
-
-    public TrainingType getSpecialization() {
-        return specialization;
-    }
-
-    public void setSpecialization(TrainingType specialization) {
-        this.specialization = specialization;
-    }
 }

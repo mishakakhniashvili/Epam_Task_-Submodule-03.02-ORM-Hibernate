@@ -1,8 +1,8 @@
 package com.epam.gymcrm.facade;
 
-import com.epam.gymcrm.model.Trainee;
-import com.epam.gymcrm.model.Trainer;
-import com.epam.gymcrm.model.Training;
+import com.epam.gymcrm.entity.Trainee;
+import com.epam.gymcrm.entity.Trainer;
+import com.epam.gymcrm.entity.Training;
 import com.epam.gymcrm.service.TraineeService;
 import com.epam.gymcrm.service.TrainerService;
 import com.epam.gymcrm.service.TrainingService;
@@ -30,16 +30,16 @@ public class GymFacade {
         return traineeService.create(trainee);
     }
 
-    public Trainee updateTrainee(Trainee trainee) {
-        return traineeService.update(trainee);
+    public Trainee updateTrainee(String username, String password, Trainee trainee) {
+        return traineeService.update(username, password, trainee);
     }
 
-    public void deleteTraineeById(Long userId) {
-        traineeService.deleteById(userId);
+    public void deleteTraineeById(Long id) {
+        traineeService.deleteById(id);
     }
 
-    public Optional<Trainee> findTraineeById(Long userId) {
-        return traineeService.findById(userId);
+    public Optional<Trainee> findTraineeById(Long id) {
+        return traineeService.findById(id);
     }
 
     public List<Trainee> findAllTrainees() {
@@ -50,12 +50,12 @@ public class GymFacade {
         return trainerService.create(trainer);
     }
 
-    public Trainer updateTrainer(Trainer trainer) {
-        return trainerService.update(trainer);
+    public Trainer updateTrainer(String username, String password, Trainer trainer) {
+        return trainerService.update(username, password, trainer);
     }
 
-    public Optional<Trainer> findTrainerById(Long userId) {
-        return trainerService.findById(userId);
+    public Optional<Trainer> findTrainerById(Long id) {
+        return trainerService.findById(id);
     }
 
     public List<Trainer> findAllTrainers() {
@@ -66,11 +66,52 @@ public class GymFacade {
         return trainingService.create(training);
     }
 
-    public Optional<Training> findTrainingById(Long trainingId) {
-        return trainingService.findById(trainingId);
+    public Optional<Training> findTrainingById(Long id) {
+        return trainingService.findById(id);
     }
 
     public List<Training> findAllTrainings() {
         return trainingService.findAll();
     }
+
+    public Optional<Trainee> findTraineeByUsername(String authUsername,String authPassword,String targetUsername) {
+        return traineeService.findByUsername(authUsername, authPassword, targetUsername);
+    }
+
+    public Optional<Trainer> findTrainerByUsername(String authUsername,String authPassword,String targetUsername) {
+        return trainerService.findByUsername(authUsername, authPassword, targetUsername);
+    }
+
+    public boolean isTraineeCredentialsValid(String username, String password) {
+        return traineeService.isCredentialsValid(username, password);
+    }
+
+    public boolean isTrainerCredentialsValid(String username, String password) {
+        return trainerService.isCredentialsValid(username, password);
+    }
+
+    public void changeTrainerPassword(String username, String oldPassword, String newPassword) {
+        trainerService.changePassword(username, oldPassword, newPassword);
+    }
+
+    public void changeTraineePassword(String username, String oldPassword, String newPassword) {
+        traineeService.changePassword(username, oldPassword, newPassword);
+    }
+
+    public void activateTrainee(String username, String password) {
+        traineeService.activate(username, password);
+    }
+
+    public void deactivateTrainee(String username, String password) {
+        traineeService.deactivate(username, password);
+    }
+
+    public void activateTrainer(String username, String password) {
+        trainerService.activate(username, password);
+    }
+
+    public void deactivateTrainer(String username, String password) {
+        trainerService.deactivate(username, password);
+    }
+
 }
