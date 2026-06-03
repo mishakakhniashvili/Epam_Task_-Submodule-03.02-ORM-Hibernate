@@ -2,7 +2,6 @@ package com.epam.gymcrm.service;
 
 import com.epam.gymcrm.dao.TrainerDao;
 import com.epam.gymcrm.dao.UserDao;
-import com.epam.gymcrm.entity.Trainee;
 import com.epam.gymcrm.entity.Trainer;
 import com.epam.gymcrm.entity.User;
 import org.slf4j.Logger;

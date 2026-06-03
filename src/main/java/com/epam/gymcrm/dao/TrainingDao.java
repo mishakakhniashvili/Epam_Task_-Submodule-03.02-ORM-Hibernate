@@ -26,4 +26,6 @@ public class TrainingDao {
     public List<Training> findAll() {
         return entityManager.createQuery("select tr from Training tr", Training.class).getResultList();
     }
+
+
 }

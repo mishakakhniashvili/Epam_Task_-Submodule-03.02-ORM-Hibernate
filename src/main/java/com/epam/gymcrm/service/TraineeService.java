@@ -1,6 +1,7 @@
 package com.epam.gymcrm.service;
 
 import com.epam.gymcrm.dao.TraineeDao;
+import com.epam.gymcrm.exception.AuthenticationException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.slf4j.Logger;
@@ -108,7 +109,7 @@ public class TraineeService {
 
     public void validateCredentials(String username, String password){
         if(!isCredentialsValid(username, password)){
-            throw new SecurityException("Invalid credentials entered");
+            throw new AuthenticationException("Invalid credentials entered");
         }
     }
 
@@ -145,4 +146,12 @@ public class TraineeService {
         LOGGER.info("Deactivated trainee with id={}", trainee.getId());
     }
 
+    @Transactional
+    public void deleteByUsername(String username, String password){
+        validateCredentials(username, password);
+        Trainee trainee = traineeDao.findByUsername(username)
+                .orElseThrow(() -> new IllegalArgumentException("Trainee not found: " + username));
+        traineeDao.deleteById(trainee.getId());
+        LOGGER.info("Deleted trainee with id={}", trainee.getId());
+    }
 }

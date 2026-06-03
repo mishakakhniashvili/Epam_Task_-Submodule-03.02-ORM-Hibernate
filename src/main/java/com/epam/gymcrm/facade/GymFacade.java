@@ -8,6 +8,7 @@ import com.epam.gymcrm.service.TrainerService;
 import com.epam.gymcrm.service.TrainingService;
 import org.springframework.stereotype.Component;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
@@ -112,6 +113,29 @@ public class GymFacade {
 
     public void deactivateTrainer(String username, String password) {
         trainerService.deactivate(username, password);
+    }
+
+    public void deleteTraineeByUsername(String username, String password) {
+        traineeService.deleteByUsername(username, password);
+    }
+    public Training addTraining(
+            String trainerUsername,
+            String trainerPassword,
+            String traineeUsername,
+            String trainingName,
+            String trainingTypeName,
+            LocalDate trainingDate,
+            Integer trainingDuration
+    ) {
+        return trainingService.addTraining(
+                trainerUsername,
+                trainerPassword,
+                traineeUsername,
+                trainingName,
+                trainingTypeName,
+                trainingDate,
+                trainingDuration
+        );
     }
 
 }
