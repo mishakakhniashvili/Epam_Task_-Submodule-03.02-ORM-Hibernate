@@ -2,23 +2,33 @@ package com.epam.gymcrm.service;
 
 import com.epam.gymcrm.dao.TraineeDao;
 import com.epam.gymcrm.dao.TrainerDao;
-import com.epam.gymcrm.model.Trainee;
-import com.epam.gymcrm.model.Trainer;
+import com.epam.gymcrm.entity.Trainer;
+import com.epam.gymcrm.exception.AuthenticationException;
+import com.epam.gymcrm.exception.EntityNotFoundException;
+import com.epam.gymcrm.exception.ValidationException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
-import java.util.stream.Collectors;
+import java.util.Set;
+
+import com.epam.gymcrm.entity.Trainee;
+import com.epam.gymcrm.entity.User;
+import com.epam.gymcrm.dao.UserDao;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class TraineeService {
 
+    private UserDao userDao;
     private TraineeDao traineeDao;
-    private TrainerDao trainerDao;
     private UsernameGenerator usernameGenerator;
     private PasswordGenerator passwordGenerator;
+    private TrainerDao trainerDao;
     private static final Logger LOGGER = LoggerFactory.getLogger(TraineeService.class);
     @Autowired
     public void setTraineeDao(TraineeDao traineeDao) {
@@ -26,8 +36,8 @@ public class TraineeService {
     }
 
     @Autowired
-    public void setTrainerDao(TrainerDao trainerDao) {
-        this.trainerDao = trainerDao;
+    public void setUserDao(UserDao userDao) {
+        this.userDao = userDao;
     }
 
     @Autowired
@@ -40,61 +50,153 @@ public class TraineeService {
         this.passwordGenerator = passwordGenerator;
     }
 
+    @Autowired
+    public void setTrainerDao(TrainerDao trainerDao) {
+        this.trainerDao = trainerDao;
+    }
+    @Transactional
     public Trainee create(Trainee trainee) {
-        trainee.setUserId(generateNextId());
-        trainee.setUsername(generateUsername(trainee));
-        trainee.setPassword(passwordGenerator.generatePassword());
-        trainee.setActive(true);
+        User user = trainee.getUser();
+        String username = generateUsername(trainee);
 
-        LOGGER.info("Creating trainee with id={} and username={}", trainee.getUserId(), trainee.getUsername());
+        user.setUsername(username);
+        user.setPassword(passwordGenerator.generatePassword());
+        user.setActive(true);
 
-        return traineeDao.save(trainee);
+        Trainee createdTrainee = traineeDao.save(trainee);
+
+        LOGGER.info("Created trainee with id={} and username={}",
+                createdTrainee.getId(),
+                createdTrainee.getUser().getUsername());
+
+        return createdTrainee;
     }
 
     //finds every existing username and generates a new one according to the rules
     private String generateUsername(Trainee trainee) {
-        List<String> existingUsernames = traineeDao.findAll()
-                .stream()
-                .map(Trainee::getUsername)
-                .collect(Collectors.toList());
-        existingUsernames.addAll(trainerDao.findAll()
-                .stream()
-                .map(Trainer::getUsername)
-                .toList());
+        User user = trainee.getUser();
+        List<String> existingUsernames = userDao.findAllUsernames();
 
         return usernameGenerator.generateUsername(
-                trainee.getFirstName(),
-                trainee.getLastName(),
+                user.getFirstName(),
+                user.getLastName(),
                 existingUsernames
         );
     }
 
-    //finds the largest id and creates the next one by adding 1
-    private Long generateNextId() {
-        return traineeDao.findAll()
-                .stream()
-                .map(Trainee::getUserId)
-                .max(Long::compareTo)
-                .orElse(0L)+1;
-
-    }
-
-    public Trainee update(Trainee trainee) {
-        LOGGER.info("Updating trainee with id={}", trainee.getUserId());
+    @Transactional
+    public Trainee update(String username, String password, Trainee trainee) {
+        validateCredentials(username, password);
+        LOGGER.info("Updating trainee with id={}", trainee.getId());
         return traineeDao.update(trainee);
     }
 
-    public void deleteById(Long userId) {
-        LOGGER.info("Deleting trainee with id={}", userId);
-        traineeDao.deleteById(userId);
+    @Transactional
+    public void deleteById(Long id) {
+        LOGGER.info("Deleting trainee with id={}", id);
+        traineeDao.deleteById(id);
     }
 
-    public Optional<Trainee> findById(Long userId) {
-        LOGGER.info("finding trainee with id={}", userId);
-        return traineeDao.findById(userId);
+    public Optional<Trainee> findById(Long id) {
+        LOGGER.info("finding trainee with id={}", id);
+        return traineeDao.findById(id);
     }
 
     public List<Trainee> findAll() {
         return traineeDao.findAll();
+    }
+
+    public Optional<Trainee> findByUsername(String authUsername, String authPassword, String targetUsername) {
+        validateCredentials(authUsername, authPassword);
+        LOGGER.info("Finding trainee with username={}", targetUsername);
+        return traineeDao.findByUsername(targetUsername);
+    }
+
+    public boolean isCredentialsValid(String username, String password) {
+        return traineeDao.findByUsername(username)
+                .map(trainee -> trainee.getUser().getPassword().equals(password))
+                .orElse(false);
+    }
+
+    public void validateCredentials(String username, String password){
+        if(!isCredentialsValid(username, password)){
+            throw new AuthenticationException("Invalid credentials entered");
+        }
+    }
+
+    @Transactional
+    public void changePassword(String username, String oldPassword, String newPassword) {
+        validateCredentials(username, oldPassword);
+
+        Trainee trainee = traineeDao.findByUsername(username).orElseThrow();
+
+        trainee.getUser().setPassword(newPassword);
+
+        traineeDao.update(trainee);
+
+        LOGGER.info("Changed password for username={}", username);
+    }
+
+    @Transactional
+    public void activate(String username, String password){
+        validateCredentials(username, password);
+        Trainee trainee = traineeDao.findByUsername(username).orElseThrow();
+        if(trainee.getUser().isActive()){throw new IllegalStateException("Trainee is already active.");}
+        trainee.getUser().setActive(true);
+        traineeDao.update(trainee);
+        LOGGER.info("Activated trainee with id={}", trainee.getId());
+    }
+
+    @Transactional
+    public void deactivate(String username, String password){
+        validateCredentials(username, password);
+        Trainee trainee = traineeDao.findByUsername(username).orElseThrow();
+        if(!trainee.getUser().isActive()){throw new IllegalStateException("Trainee is already inactive.");}
+        trainee.getUser().setActive(false);
+        traineeDao.update(trainee);
+        LOGGER.info("Deactivated trainee with id={}", trainee.getId());
+    }
+
+    @Transactional
+    public void deleteByUsername(String username, String password){
+        validateCredentials(username, password);
+        Trainee trainee = traineeDao.findByUsername(username)
+                .orElseThrow(() -> new IllegalArgumentException("Trainee not found: " + username));
+        traineeDao.deleteById(trainee.getId());
+        LOGGER.info("Deleted trainee with id={}", trainee.getId());
+    }
+
+    @Transactional(readOnly = true)
+    public List<Trainer> getTrainersNotAssignedToTrainee(String traineeUsername, String traineePassword){
+        validateCredentials(traineeUsername, traineePassword);
+        return trainerDao.findTrainersNotAssignedToTrainee(traineeUsername);
+    }
+
+    @Transactional
+    public Trainee updateTraineeTrainersList(
+            String traineeUsername,
+            String traineePassword,
+            List<String> trainerUsernames
+    ){
+        validateCredentials(traineeUsername, traineePassword);
+        Trainee trainee = traineeDao.findByUsername(traineeUsername).orElseThrow(
+                () -> new EntityNotFoundException("trainee" ,  traineeUsername)
+        );
+        if(trainerUsernames == null){
+            throw new ValidationException("Trainer usernames cannot be null");
+        }
+
+        Set<Trainer> trainers = new HashSet<>();
+        for(String trainerUsername : trainerUsernames){
+            if( trainerUsername == null || trainerUsername.isBlank()){
+                throw new ValidationException("Trainer username cannot be blank");
+            }
+            trainers.add(trainerDao.findByUsername(trainerUsername).orElseThrow(
+                    () -> new EntityNotFoundException("trainer" ,  trainerUsername)
+            ));
+        }
+
+        trainee.setTrainers(trainers);
+        return traineeDao.update(trainee);
     }
 }
