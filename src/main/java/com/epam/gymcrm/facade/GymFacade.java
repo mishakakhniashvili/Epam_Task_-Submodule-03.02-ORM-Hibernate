@@ -137,5 +137,53 @@ public class GymFacade {
                 trainingDuration
         );
     }
+    public List<Training> getTraineeTrainings(
+            String traineeUsername,
+            String traineePassword,
+            LocalDate fromDate,
+            LocalDate toDate,
+            String trainerUsername,
+            String trainingTypeName
+    ) {
+        return trainingService.getTraineeTrainings(
+                traineeUsername,
+                traineePassword,
+                fromDate,
+                toDate,
+                trainerUsername,
+                trainingTypeName
+        );
+    }
 
+    public List<Training> getTrainerTrainings(
+            String trainerUsername,
+            String trainerPassword,
+            LocalDate fromDate,
+            LocalDate toDate,
+            String traineeUsername
+    ) {
+        return trainingService.getTrainerTrainings(
+                trainerUsername,
+                trainerPassword,
+                fromDate,
+                toDate,
+                traineeUsername
+        );
+    }
+
+    public List<Trainer> getTrainersNotAssignedToTrainee(String traineeUsername, String traineePassword){
+        return traineeService.getTrainersNotAssignedToTrainee(traineeUsername, traineePassword);
+    }
+
+    public Trainee updateTraineeTrainersList(
+            String traineeUsername,
+            String traineePassword,
+            List<String> trainerUsernames
+    ) {
+        return traineeService.updateTraineeTrainersList(
+                traineeUsername,
+                traineePassword,
+                trainerUsernames
+        );
+    }
 }

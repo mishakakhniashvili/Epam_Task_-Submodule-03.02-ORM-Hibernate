@@ -122,4 +122,60 @@ public class TrainingService {
             throw  new ValidationException("Parameter should not be empty");
         }
     }
+
+    @Transactional(readOnly = true)
+    public List<Training> getTraineeTrainings(
+            String traineeUsername,
+            String traineePassword,
+            LocalDate fromDate,
+            LocalDate toDate,
+            String trainerUsername,
+            String trainingTypeName
+    ){
+        validateParameter(traineeUsername);
+        validateParameter(traineePassword);
+        if (fromDate != null && toDate != null && fromDate.isAfter(toDate)) {
+            throw new ValidationException("From date cannot be after to date");
+        }
+        Trainee trainee =traineeDao.findByUsername(traineeUsername)
+                .orElseThrow(() -> new EntityNotFoundException("trainee",traineeUsername));
+        if (!trainee.getUser().getPassword().equals(traineePassword)) {
+            throw new AuthenticationException("Invalid credentials entered");
+        }
+
+        return trainingDao.findTraineeTrainings(
+                 traineeUsername,
+                 fromDate,
+                 toDate,
+                 trainerUsername,
+                 trainingTypeName
+        );
+
+    }
+    @Transactional(readOnly = true)
+    public List<Training> getTrainerTrainings(
+            String trainerUsername,
+            String trainerPassword,
+            LocalDate fromDate,
+            LocalDate toDate,
+            String traineeUsername
+    ){
+        validateParameter(trainerUsername);
+        validateParameter(trainerPassword);
+        if (fromDate != null && toDate != null && fromDate.isAfter(toDate)) {
+            throw new ValidationException("From date cannot be after to date");
+        }
+        Trainer trainer = trainerDao.findByUsername(trainerUsername)
+                .orElseThrow(() -> new EntityNotFoundException("trainer",trainerUsername));
+        if (!trainer.getUser().getPassword().equals(trainerPassword)) {
+            throw new AuthenticationException("Invalid credentials entered");
+        }
+
+        return trainingDao.findTrainerTrainings(
+                 trainerUsername,
+                 fromDate,
+                 toDate,
+                 traineeUsername
+        );
+    }
 }

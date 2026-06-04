@@ -1,13 +1,20 @@
 package com.epam.gymcrm.service;
 
 import com.epam.gymcrm.dao.TraineeDao;
+import com.epam.gymcrm.dao.TrainerDao;
+import com.epam.gymcrm.entity.Trainer;
 import com.epam.gymcrm.exception.AuthenticationException;
+import com.epam.gymcrm.exception.EntityNotFoundException;
+import com.epam.gymcrm.exception.ValidationException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 import com.epam.gymcrm.entity.Trainee;
 import com.epam.gymcrm.entity.User;
@@ -21,12 +28,12 @@ public class TraineeService {
     private TraineeDao traineeDao;
     private UsernameGenerator usernameGenerator;
     private PasswordGenerator passwordGenerator;
+    private TrainerDao trainerDao;
     private static final Logger LOGGER = LoggerFactory.getLogger(TraineeService.class);
     @Autowired
     public void setTraineeDao(TraineeDao traineeDao) {
         this.traineeDao = traineeDao;
     }
-
 
     @Autowired
     public void setUserDao(UserDao userDao) {
@@ -43,6 +50,10 @@ public class TraineeService {
         this.passwordGenerator = passwordGenerator;
     }
 
+    @Autowired
+    public void setTrainerDao(TrainerDao trainerDao) {
+        this.trainerDao = trainerDao;
+    }
     @Transactional
     public Trainee create(Trainee trainee) {
         User user = trainee.getUser();
@@ -153,5 +164,39 @@ public class TraineeService {
                 .orElseThrow(() -> new IllegalArgumentException("Trainee not found: " + username));
         traineeDao.deleteById(trainee.getId());
         LOGGER.info("Deleted trainee with id={}", trainee.getId());
+    }
+
+    @Transactional(readOnly = true)
+    public List<Trainer> getTrainersNotAssignedToTrainee(String traineeUsername, String traineePassword){
+        validateCredentials(traineeUsername, traineePassword);
+        return trainerDao.findTrainersNotAssignedToTrainee(traineeUsername);
+    }
+
+    @Transactional
+    public Trainee updateTraineeTrainersList(
+            String traineeUsername,
+            String traineePassword,
+            List<String> trainerUsernames
+    ){
+        validateCredentials(traineeUsername, traineePassword);
+        Trainee trainee = traineeDao.findByUsername(traineeUsername).orElseThrow(
+                () -> new EntityNotFoundException("trainee" ,  traineeUsername)
+        );
+        if(trainerUsernames == null){
+            throw new ValidationException("Trainer usernames cannot be null");
+        }
+
+        Set<Trainer> trainers = new HashSet<>();
+        for(String trainerUsername : trainerUsernames){
+            if( trainerUsername == null || trainerUsername.isBlank()){
+                throw new ValidationException("Trainer username cannot be blank");
+            }
+            trainers.add(trainerDao.findByUsername(trainerUsername).orElseThrow(
+                    () -> new EntityNotFoundException("trainer" ,  trainerUsername)
+            ));
+        }
+
+        trainee.setTrainers(trainers);
+        return traineeDao.update(trainee);
     }
 }

@@ -42,4 +42,17 @@ public class TrainerDao {
                 .setParameter("username", username)
                 .getResultStream().findFirst();
     }
+
+    public List<Trainer> findTrainersNotAssignedToTrainee(String traineeUsername){
+        return entityManager
+                .createQuery("select tr from Trainer tr " +
+                                "where tr not in (" +
+                                "select assignedTrainer from Trainee te " +
+                                "join te.trainers assignedTrainer " +
+                                "where te.user.username = :traineeUsername" +
+                                ")"
+                        , Trainer.class)
+                .setParameter("traineeUsername", traineeUsername)
+                .getResultList();
+    }
 }
