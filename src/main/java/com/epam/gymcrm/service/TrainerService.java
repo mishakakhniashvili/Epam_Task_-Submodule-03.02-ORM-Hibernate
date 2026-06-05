@@ -4,6 +4,8 @@ import com.epam.gymcrm.dao.TrainerDao;
 import com.epam.gymcrm.dao.UserDao;
 import com.epam.gymcrm.entity.Trainer;
 import com.epam.gymcrm.entity.User;
+import com.epam.gymcrm.exception.AuthenticationException;
+import com.epam.gymcrm.exception.ValidationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -38,6 +40,7 @@ public class TrainerService {
 
     @Transactional
     public Trainer create(Trainer trainer) {
+        validateTrainerRequiredFields(trainer);
         User user = trainer.getUser();
         String username = generateUsername(trainer);
 
@@ -56,6 +59,7 @@ public class TrainerService {
     @Transactional
     public Trainer update(String username, String password, Trainer trainer) {
         validateCredentials(username, password);
+        validateTrainerRequiredFields(trainer);
         LOGGER.info("Updating trainer with id={}", trainer.getId());
         return trainerDao.update(trainer);
     }
@@ -103,8 +107,7 @@ public class TrainerService {
 
     public void validateCredentials(String username, String password){
         if(!isCredentialsValid(username, password)){
-            throw new SecurityException("Invalid credentials entered");
-        }
+            throw new AuthenticationException("Invalid credentials entered");        }
     }
 
     @Transactional
@@ -143,4 +146,25 @@ public class TrainerService {
         LOGGER.info("Deactivated trainer with id={}", trainer.getId());
     }
 
+    private void validateTrainerRequiredFields(Trainer trainer) {
+        if (trainer == null) {
+            throw new ValidationException("Trainer cannot be null");
+        }
+
+        if (trainer.getUser() == null) {
+            throw new ValidationException("Trainer user cannot be null");
+        }
+        if (trainer.getSpecialization() == null) {
+            throw new ValidationException("Trainer specialization cannot be null");
+        }
+
+        validateRequiredString(trainer.getUser().getFirstName(), "firstName");
+        validateRequiredString(trainer.getUser().getLastName(), "lastName");
+    }
+
+    private void validateRequiredString(String value, String fieldName) {
+        if (value == null || value.isBlank()) {
+            throw new ValidationException(fieldName + " cannot be null or blank");
+        }
+    }
 }

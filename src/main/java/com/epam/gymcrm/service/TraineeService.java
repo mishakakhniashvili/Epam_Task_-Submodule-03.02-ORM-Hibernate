@@ -56,6 +56,7 @@ public class TraineeService {
     }
     @Transactional
     public Trainee create(Trainee trainee) {
+        validateTraineeRequiredFields(trainee);
         User user = trainee.getUser();
         String username = generateUsername(trainee);
 
@@ -87,6 +88,7 @@ public class TraineeService {
     @Transactional
     public Trainee update(String username, String password, Trainee trainee) {
         validateCredentials(username, password);
+        validateTraineeRequiredFields(trainee);
         LOGGER.info("Updating trainee with id={}", trainee.getId());
         return traineeDao.update(trainee);
     }
@@ -195,8 +197,26 @@ public class TraineeService {
                     () -> new EntityNotFoundException("trainer" ,  trainerUsername)
             ));
         }
-
         trainee.setTrainers(trainers);
         return traineeDao.update(trainee);
+    }
+
+    private void validateTraineeRequiredFields(Trainee trainee) {
+        if (trainee == null) {
+            throw new ValidationException("Trainee cannot be null");
+        }
+
+        if (trainee.getUser() == null) {
+            throw new ValidationException("Trainee user cannot be null");
+        }
+
+        validateRequiredString(trainee.getUser().getFirstName(), "firstName");
+        validateRequiredString(trainee.getUser().getLastName(), "lastName");
+    }
+
+    private void validateRequiredString(String value, String fieldName) {
+        if (value == null || value.isBlank()) {
+            throw new ValidationException(fieldName + " cannot be null or blank");
+        }
     }
 }
