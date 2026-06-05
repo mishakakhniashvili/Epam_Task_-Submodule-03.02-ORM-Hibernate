@@ -35,44 +35,12 @@ public class GymFacade {
         return traineeService.update(username, password, trainee);
     }
 
-    public void deleteTraineeById(Long id) {
-        traineeService.deleteById(id);
-    }
-
-    public Optional<Trainee> findTraineeById(Long id) {
-        return traineeService.findById(id);
-    }
-
-    public List<Trainee> findAllTrainees() {
-        return traineeService.findAll();
-    }
-
     public Trainer createTrainer(Trainer trainer) {
         return trainerService.create(trainer);
     }
 
     public Trainer updateTrainer(String username, String password, Trainer trainer) {
         return trainerService.update(username, password, trainer);
-    }
-
-    public Optional<Trainer> findTrainerById(Long id) {
-        return trainerService.findById(id);
-    }
-
-    public List<Trainer> findAllTrainers() {
-        return trainerService.findAll();
-    }
-
-    public Training createTraining(Training training) {
-        return trainingService.create(training);
-    }
-
-    public Optional<Training> findTrainingById(Long id) {
-        return trainingService.findById(id);
-    }
-
-    public List<Training> findAllTrainings() {
-        return trainingService.findAll();
     }
 
     public Optional<Trainee> findTraineeByUsername(String authUsername,String authPassword,String targetUsername) {
