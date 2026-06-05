@@ -1,136 +1,147 @@
 package com.epam.gymcrm.service;
 
-import com.epam.gymcrm.dao.TraineeDao;
 import com.epam.gymcrm.dao.TrainerDao;
-import com.epam.gymcrm.model.Trainee;
-import com.epam.gymcrm.model.Trainer;
-import com.epam.gymcrm.storage.Storage;
+import com.epam.gymcrm.dao.UserDao;
+import com.epam.gymcrm.entity.Trainer;
+import com.epam.gymcrm.entity.TrainingType;
+import com.epam.gymcrm.entity.User;
+import com.epam.gymcrm.exception.AuthenticationException;
+import com.epam.gymcrm.exception.ValidationException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 
-import java.time.LocalDate;
-import java.util.HashMap;
+import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
 
 class TrainerServiceTest {
 
     private TrainerService trainerService;
     private TrainerDao trainerDao;
-    private TraineeDao traineeDao;
+    private UserDao userDao;
+    private UsernameGenerator usernameGenerator;
+    private PasswordGenerator passwordGenerator;
 
     @BeforeEach
     void setUp() {
-        Storage storage = new Storage();
-
-        storage.setTrainees(new HashMap<>());
-        storage.setTrainers(new HashMap<>());
-        storage.setTrainings(new HashMap<>());
-        storage.setTrainingTypes(new HashMap<>());
-
-        trainerDao = new TrainerDao();
-        trainerDao.setStorage(storage);
-
-        traineeDao = new TraineeDao();
-        traineeDao.setStorage(storage);
+        trainerDao = Mockito.mock(TrainerDao.class);
+        userDao = Mockito.mock(UserDao.class);
+        usernameGenerator = Mockito.mock(UsernameGenerator.class);
+        passwordGenerator = Mockito.mock(PasswordGenerator.class);
 
         trainerService = new TrainerService();
         trainerService.setTrainerDao(trainerDao);
-        trainerService.setTraineeDao(traineeDao);
-        trainerService.setUsernameGenerator(new UsernameGenerator());
-        trainerService.setPasswordGenerator(new PasswordGenerator());
+        trainerService.setUserDao(userDao);
+        trainerService.setUsernameGenerator(usernameGenerator);
+        trainerService.setPasswordGenerator(passwordGenerator);
     }
 
     @Test
-    void shouldCreateTrainerWithGeneratedFields() {
-        Trainer trainer = new Trainer(
-                null,
-                "Mike",
-                "Brown",
-                null,
-                null,
-                false,
-                "Fitness"
-        );
+    void shouldCreateTrainerWithGeneratedUsernamePasswordAndActiveStatus() {
+        TrainingType fitness = new TrainingType("Fitness");
+        User user = new User("Mike", "Brown", null, null, false);
+        Trainer trainer = new Trainer(user, fitness);
+
+        when(userDao.findAllUsernames()).thenReturn(List.of());
+        when(usernameGenerator.generateUsername("Mike", "Brown", List.of()))
+                .thenReturn("Mike.Brown");
+        when(passwordGenerator.generatePassword()).thenReturn("pass123456");
+        when(trainerDao.save(trainer)).thenAnswer(invocation -> {
+            trainer.setId(1L);
+            trainer.getUser().setId(10L);
+            return trainer;
+        });
 
         Trainer createdTrainer = trainerService.create(trainer);
 
-        assertEquals(1L, createdTrainer.getUserId());
-        assertEquals("Mike.Brown", createdTrainer.getUsername());
-        assertNotNull(createdTrainer.getPassword());
-        assertEquals(10, createdTrainer.getPassword().length());
-        assertTrue(createdTrainer.isActive());
+        assertEquals(1L, createdTrainer.getId());
+        assertEquals("Mike.Brown", createdTrainer.getUser().getUsername());
+        assertEquals("pass123456", createdTrainer.getUser().getPassword());
+        assertTrue(createdTrainer.getUser().isActive());
+
+        verify(trainerDao).save(trainer);
     }
 
     @Test
-    void shouldGenerateUsernameWithSuffixWhenTraineeAlreadyHasSameUsername() {
-        Trainee trainee = new Trainee(
-                1L,
-                "John",
-                "Smith",
-                "John.Smith",
-                "password123",
-                true,
-                LocalDate.of(2000, 1, 1),
-                "Tbilisi"
-        );
+    void shouldThrowValidationExceptionWhenCreatingTrainerWithoutSpecialization() {
+        User user = new User("Mike", "Brown", null, null, false);
+        Trainer trainer = new Trainer(user, null);
 
-        traineeDao.save(trainee);
+        assertThrows(ValidationException.class, () -> trainerService.create(trainer));
 
-        Trainer trainer = new Trainer(
-                null,
-                "John",
-                "Smith",
-                null,
-                null,
-                false,
-                "Fitness"
-        );
-
-        Trainer createdTrainer = trainerService.create(trainer);
-
-        assertEquals("John.Smith1", createdTrainer.getUsername());
+        verify(trainerDao, never()).save(any());
     }
 
     @Test
-    void shouldFindTrainerById() {
-        Trainer trainer = new Trainer(
-                null,
-                "Mike",
-                "Brown",
-                null,
-                null,
-                false,
-                "Fitness"
-        );
+    void shouldUpdateTrainerWhenCredentialsAreValid() {
+        TrainingType fitness = new TrainingType("Fitness");
+        TrainingType yoga = new TrainingType("Yoga");
 
-        Trainer createdTrainer = trainerService.create(trainer);
+        User authUser = new User("Mike", "Brown", "Mike.Brown", "oldpass", true);
+        Trainer existingTrainer = new Trainer(authUser, fitness);
 
-        Optional<Trainer> foundTrainer = trainerService.findById(createdTrainer.getUserId());
+        User updatedUser = new User("Mike", "Brown", "Mike.Brown", "oldpass", true);
+        Trainer updatedTrainer = new Trainer(updatedUser, yoga);
+        updatedTrainer.setId(1L);
 
-        assertTrue(foundTrainer.isPresent());
-        assertEquals("Mike.Brown", foundTrainer.get().getUsername());
+        when(trainerDao.findByUsername("Mike.Brown")).thenReturn(Optional.of(existingTrainer));
+        when(trainerDao.update(updatedTrainer)).thenReturn(updatedTrainer);
+
+        Trainer result = trainerService.update("Mike.Brown", "oldpass", updatedTrainer);
+
+        assertEquals(yoga, result.getSpecialization());
+        verify(trainerDao).update(updatedTrainer);
     }
 
     @Test
-    void shouldUpdateTrainer() {
-        Trainer trainer = new Trainer(
-                null,
-                "Mike",
-                "Brown",
-                null,
-                null,
-                false,
-                "Fitness"
-        );
+    void shouldThrowAuthenticationExceptionWhenUpdatingWithWrongPassword() {
+        TrainingType fitness = new TrainingType("Fitness");
 
-        Trainer createdTrainer = trainerService.create(trainer);
-        createdTrainer.setSpecialization("Yoga");
+        User authUser = new User("Mike", "Brown", "Mike.Brown", "oldpass", true);
+        Trainer existingTrainer = new Trainer(authUser, fitness);
 
-        Trainer updatedTrainer = trainerService.update(createdTrainer);
+        User updatedUser = new User("Mike", "Brown", "Mike.Brown", "oldpass", true);
+        Trainer updatedTrainer = new Trainer(updatedUser, fitness);
 
-        assertEquals("Yoga", updatedTrainer.getSpecialization());
-        assertEquals("Yoga", trainerService.findById(updatedTrainer.getUserId()).get().getSpecialization());
+        when(trainerDao.findByUsername("Mike.Brown")).thenReturn(Optional.of(existingTrainer));
+
+        assertThrows(AuthenticationException.class,
+                () -> trainerService.update("Mike.Brown", "wrongpass", updatedTrainer));
+
+        verify(trainerDao, never()).update(any());
+    }
+
+    @Test
+    void shouldChangePasswordWhenOldPasswordIsValid() {
+        TrainingType fitness = new TrainingType("Fitness");
+        User user = new User("Mike", "Brown", "Mike.Brown", "oldpass", true);
+        Trainer trainer = new Trainer(user, fitness);
+
+        when(trainerDao.findByUsername("Mike.Brown")).thenReturn(Optional.of(trainer));
+        when(trainerDao.update(trainer)).thenReturn(trainer);
+
+        trainerService.changePassword("Mike.Brown", "oldpass", "newpass");
+
+        assertEquals("newpass", trainer.getUser().getPassword());
+        verify(trainerDao).update(trainer);
+    }
+
+    @Test
+    void shouldDeactivateActiveTrainer() {
+        TrainingType fitness = new TrainingType("Fitness");
+        User user = new User("Mike", "Brown", "Mike.Brown", "password", true);
+        Trainer trainer = new Trainer(user, fitness);
+
+        when(trainerDao.findByUsername("Mike.Brown")).thenReturn(Optional.of(trainer));
+        when(trainerDao.update(trainer)).thenReturn(trainer);
+
+        trainerService.deactivate("Mike.Brown", "password");
+
+        assertFalse(trainer.getUser().isActive());
+        verify(trainerDao).update(trainer);
     }
 }

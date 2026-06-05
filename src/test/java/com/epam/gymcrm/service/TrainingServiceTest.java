@@ -1,114 +1,211 @@
 package com.epam.gymcrm.service;
 
+import com.epam.gymcrm.dao.TraineeDao;
+import com.epam.gymcrm.dao.TrainerDao;
 import com.epam.gymcrm.dao.TrainingDao;
-import com.epam.gymcrm.model.Training;
-import com.epam.gymcrm.model.TrainingType;
-import com.epam.gymcrm.storage.Storage;
+import com.epam.gymcrm.dao.TrainingTypeDao;
+import com.epam.gymcrm.entity.Trainee;
+import com.epam.gymcrm.entity.Trainer;
+import com.epam.gymcrm.entity.Training;
+import com.epam.gymcrm.entity.TrainingType;
+import com.epam.gymcrm.entity.User;
+import com.epam.gymcrm.exception.AuthenticationException;
+import com.epam.gymcrm.exception.ValidationException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 
 import java.time.LocalDate;
-import java.util.HashMap;
+import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.*;
 
 class TrainingServiceTest {
 
     private TrainingService trainingService;
+    private TrainingDao trainingDao;
+    private TraineeDao traineeDao;
+    private TrainerDao trainerDao;
+    private TrainingTypeDao trainingTypeDao;
 
     @BeforeEach
     void setUp() {
-        Storage storage = new Storage();
-
-        storage.setTrainees(new HashMap<>());
-        storage.setTrainers(new HashMap<>());
-        storage.setTrainings(new HashMap<>());
-        storage.setTrainingTypes(new HashMap<>());
-
-        TrainingDao trainingDao = new TrainingDao();
-        trainingDao.setStorage(storage);
+        trainingDao = Mockito.mock(TrainingDao.class);
+        traineeDao = Mockito.mock(TraineeDao.class);
+        trainerDao = Mockito.mock(TrainerDao.class);
+        trainingTypeDao = Mockito.mock(TrainingTypeDao.class);
 
         trainingService = new TrainingService();
         trainingService.setTrainingDao(trainingDao);
+        trainingService.setTraineeDao(traineeDao);
+        trainingService.setTrainerDao(trainerDao);
+        trainingService.setTrainingTypeDao(trainingTypeDao);
     }
 
     @Test
-    void shouldCreateTrainingWithGeneratedId() {
-        Training training = new Training(
-                null,
-                1L,
-                1L,
+    void shouldAddTrainingWhenTrainerCredentialsAreValid() {
+        TrainingType fitness = new TrainingType("Fitness");
+
+        Trainee trainee = new Trainee(
+                new User("John", "Smith", "John.Smith", "traineePass", true),
+                LocalDate.of(2000, 1, 1),
+                "Tbilisi"
+        );
+
+        Trainer trainer = new Trainer(
+                new User("Mike", "Brown", "Mike.Brown", "trainerPass", true),
+                fitness
+        );
+
+        when(trainerDao.findByUsername("Mike.Brown")).thenReturn(Optional.of(trainer));
+        when(traineeDao.findByUsername("John.Smith")).thenReturn(Optional.of(trainee));
+        when(trainingTypeDao.findByName("Fitness")).thenReturn(Optional.of(fitness));
+        when(trainingDao.save(any(Training.class))).thenAnswer(invocation -> {
+            Training training = invocation.getArgument(0);
+            training.setId(1L);
+            return training;
+        });
+
+        Training createdTraining = trainingService.addTraining(
+                "Mike.Brown",
+                "trainerPass",
+                "John.Smith",
                 "Morning Training",
-                new TrainingType("Fitness"),
+                "Fitness",
                 LocalDate.of(2026, 5, 10),
                 60
         );
 
-        Training createdTraining = trainingService.create(training);
-
-        assertEquals(1L, createdTraining.getTrainingId());
-        assertEquals(1L, createdTraining.getTraineeId());
-        assertEquals(1L, createdTraining.getTrainerId());
+        assertEquals(1L, createdTraining.getId());
         assertEquals("Morning Training", createdTraining.getTrainingName());
-        assertEquals("Fitness", createdTraining.getTrainingType().getTrainingTypeName());
         assertEquals(LocalDate.of(2026, 5, 10), createdTraining.getTrainingDate());
         assertEquals(60, createdTraining.getTrainingDuration());
+        assertSame(trainer, createdTraining.getTrainer());
+        assertSame(trainee, createdTraining.getTrainee());
+        assertSame(fitness, createdTraining.getTrainingType());
+
+        verify(trainingDao).save(any(Training.class));
     }
 
     @Test
-    void shouldGenerateNextTrainingId() {
-        Training firstTraining = new Training(
-                null,
-                1L,
-                1L,
-                "Morning Training",
-                new TrainingType("Fitness"),
-                LocalDate.of(2026, 5, 10),
-                60
+    void shouldThrowAuthenticationExceptionWhenTrainerPasswordIsWrong() {
+        TrainingType fitness = new TrainingType("Fitness");
+
+        Trainer trainer = new Trainer(
+                new User("Mike", "Brown", "Mike.Brown", "trainerPass", true),
+                fitness
         );
 
-        Training secondTraining = new Training(
-                null,
-                1L,
-                1L,
-                "Evening Training",
-                new TrainingType("Yoga"),
-                LocalDate.of(2026, 5, 11),
-                45
-        );
+        when(trainerDao.findByUsername("Mike.Brown")).thenReturn(Optional.of(trainer));
 
-        Training createdFirstTraining = trainingService.create(firstTraining);
-        Training createdSecondTraining = trainingService.create(secondTraining);
+        assertThrows(AuthenticationException.class,
+                () -> trainingService.addTraining(
+                        "Mike.Brown",
+                        "wrongPass",
+                        "John.Smith",
+                        "Morning Training",
+                        "Fitness",
+                        LocalDate.of(2026, 5, 10),
+                        60
+                ));
 
-        assertEquals(1L, createdFirstTraining.getTrainingId());
-        assertEquals(2L, createdSecondTraining.getTrainingId());
+        verify(trainingDao, never()).save(any());
     }
 
     @Test
-    void shouldFindTrainingById() {
-        Training training = new Training(
-                null,
-                1L,
-                1L,
-                "Morning Training",
-                new TrainingType("Fitness"),
-                LocalDate.of(2026, 5, 10),
-                60
-        );
+    void shouldThrowValidationExceptionWhenTrainingDurationIsInvalid() {
+        assertThrows(ValidationException.class,
+                () -> trainingService.addTraining(
+                        "Mike.Brown",
+                        "trainerPass",
+                        "John.Smith",
+                        "Morning Training",
+                        "Fitness",
+                        LocalDate.of(2026, 5, 10),
+                        0
+                ));
 
-        Training createdTraining = trainingService.create(training);
-
-        Optional<Training> foundTraining = trainingService.findById(createdTraining.getTrainingId());
-
-        assertTrue(foundTraining.isPresent());
-        assertEquals("Morning Training", foundTraining.get().getTrainingName());
+        verify(trainingDao, never()).save(any());
     }
 
     @Test
-    void shouldReturnEmptyOptionalWhenTrainingNotFound() {
-        Optional<Training> foundTraining = trainingService.findById(999L);
+    void shouldReturnTraineeTrainingsWithFilters() {
+        LocalDate fromDate = LocalDate.of(2026, 1, 1);
+        LocalDate toDate = LocalDate.of(2026, 12, 31);
 
-        assertTrue(foundTraining.isEmpty());
+        Trainee trainee = new Trainee(
+                new User("John", "Smith", "John.Smith", "traineePass", true),
+                LocalDate.of(2000, 1, 1),
+                "Tbilisi"
+        );
+
+        List<Training> trainings = List.of(new Training());
+
+        when(traineeDao.findByUsername("John.Smith")).thenReturn(Optional.of(trainee));
+        when(trainingDao.findTraineeTrainings(
+                "John.Smith",
+                fromDate,
+                toDate,
+                "Mike.Brown",
+                "Fitness"
+        )).thenReturn(trainings);
+
+        List<Training> result = trainingService.getTraineeTrainings(
+                "John.Smith",
+                "traineePass",
+                fromDate,
+                toDate,
+                "Mike.Brown",
+                "Fitness"
+        );
+
+        assertEquals(trainings, result);
+    }
+
+    @Test
+    void shouldReturnTrainerTrainingsWithFilters() {
+        LocalDate fromDate = LocalDate.of(2026, 1, 1);
+        LocalDate toDate = LocalDate.of(2026, 12, 31);
+
+        TrainingType fitness = new TrainingType("Fitness");
+        Trainer trainer = new Trainer(
+                new User("Mike", "Brown", "Mike.Brown", "trainerPass", true),
+                fitness
+        );
+
+        List<Training> trainings = List.of(new Training());
+
+        when(trainerDao.findByUsername("Mike.Brown")).thenReturn(Optional.of(trainer));
+        when(trainingDao.findTrainerTrainings(
+                "Mike.Brown",
+                fromDate,
+                toDate,
+                "John.Smith"
+        )).thenReturn(trainings);
+
+        List<Training> result = trainingService.getTrainerTrainings(
+                "Mike.Brown",
+                "trainerPass",
+                fromDate,
+                toDate,
+                "John.Smith"
+        );
+
+        assertEquals(trainings, result);
+    }
+
+    @Test
+    void shouldThrowValidationExceptionWhenFromDateIsAfterToDate() {
+        assertThrows(ValidationException.class,
+                () -> trainingService.getTrainerTrainings(
+                        "Mike.Brown",
+                        "trainerPass",
+                        LocalDate.of(2026, 12, 31),
+                        LocalDate.of(2026, 1, 1),
+                        "John.Smith"
+                ));
     }
 }
