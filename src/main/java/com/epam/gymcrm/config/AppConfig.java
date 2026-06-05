@@ -1,9 +1,6 @@
 package com.epam.gymcrm.config;
 
-import com.epam.gymcrm.model.Trainee;
-import com.epam.gymcrm.model.Trainer;
-import com.epam.gymcrm.model.Training;
-import com.epam.gymcrm.model.TrainingType;
+
 import jakarta.persistence.EntityManagerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -19,8 +16,6 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.EnableTransactionManagement;
 
 import javax.sql.DataSource;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.Properties;
 
 @Configuration
@@ -96,23 +91,5 @@ public class AppConfig {
 
         return properties;
     }
-    @Bean(name = "traineeStorage")
-    public Map<Long, Trainee> traineeStorage() {
-        return new HashMap<>();
-    }
 
-    @Bean(name = "trainerStorage")
-    public Map<Long, Trainer> trainerStorage() {
-        return new HashMap<>();
-    }
-
-    @Bean(name = "trainingStorage")
-    public Map<Long, Training> trainingStorage() {
-        return new HashMap<>();
-    }
-
-    @Bean(name = "trainingTypeStorage")
-    public Map<String, TrainingType> trainingTypeStorage() {
-        return new HashMap<>();
-    }
 }

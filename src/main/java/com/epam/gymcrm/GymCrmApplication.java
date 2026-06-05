@@ -1,14 +1,7 @@
 package com.epam.gymcrm;
 
 import com.epam.gymcrm.config.AppConfig;
-import com.epam.gymcrm.facade.GymFacade;
-import com.epam.gymcrm.model.Trainee;
-import com.epam.gymcrm.model.Trainer;
-import com.epam.gymcrm.model.Training;
-import com.epam.gymcrm.model.TrainingType;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
-
-import java.time.LocalDate;
 
 
 public class GymCrmApplication {
